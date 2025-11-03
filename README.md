@@ -1,5 +1,4 @@
 
-````markdown
 # 🧠 Data Version Control (DVC) with Google Cloud Storage
 
 This repository demonstrates the integration of **Data Version Control (DVC)** with **Google Cloud Storage (GCS)** to enable efficient, reproducible, and collaborative data management for machine learning projects.
@@ -51,7 +50,6 @@ This lab walks through setting up a DVC pipeline with GCS as a remote storage ba
 
 ```bash
 pip install dvc[gs]
-````
 
 > 💡 Note: Use `[s3]`, `[azure]`, or `[gdrive]` instead if using a different cloud provider.
 > To install all remotes: `pip install dvc[all]`
