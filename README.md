@@ -1,54 +1,227 @@
-## Data Version Control (DVC)
 
-- [DVC](https://dvc.org/) is an open-source tool that serves as a powerful asset in the machine learning project toolkit, with a primary focus on data versioning.
-- **Data versioning** is a critical aspect of any ML project. It allows you to track changes and updates in your datasets over time, ensuring you can always recreate, compare, and reference specific dataset versions used in your experiments.
-- In this lab tutorial, we will be utilizing DVC with Google Cloud Storage to enhance data versioning capabilities, ensuring efficient data management and collaboration within your machine learning project.
-### Creating a Google Cloud Storage Bucket
-1. Navigate to [Google Cloud Console](https://console.cloud.google.com/).
-2. Ensure you've created a new project specifically for this lab.
-3. In the Navigation menu, select "Cloud Storage," then go to "Buckets," and click on "Create a new bucket."
-4. Assign a unique name to your bucket.
-5. Select the region as `us-east1`
-6. Proceed by clicking "Continue" until your new bucket is successfully created.
-7. Once the bucket is created, we need to get the credentials to connect the GCP remote to the project. Go to the `IAM & Admin` service and go to `Service Accounts` in the left sidebar.
-8. Click the `Create Service Account` button to create a new service account that you'll use to connect to the DVC project in a bit. Now you can add the name and ID for this service account and keep all the default settings. We've chosen `lab2` for the name. Click `Create and Continue` and it will show the permissions settings. Select `Owner` in the dropdown and click `Continue`.
-9. Then add your user to have access to the service account and click `Done`. Finally, you'll be redirected to the `Service accounts` page. You’ll see your service account and you’ll be able to click on `Actions` and go to where you `Manage keys` for this service account. 
-10. Once you’ve been redirected, click the `Add Key` button and this will bring up the credentials you need to authenticate your GCP account with your project. Proceed by downloading the credentials in JSON format and securely store the file. This file will serve as the authentication mechanism for DVC when connecting to Google Cloud.
-### Installing DVC with Google Cloud Support
-- Ensure you have DVC with Google Cloud support installed on your system by using the following command:
-	`pip install dvc[gs]`
-- Note that, depending on your chosen [remote storage](https://dvc.org/doc/user-guide/data-management/remote-storage), you may need to install optional dependencies such as `[s3]`, `[azure]`, `[gdrive]`, `[gs]`, `[oss]`, `[ssh]`. To include all optional dependencies, use `[all]`.
-- Run this command to setup google cloud bucket as your storage `dvc remote add -d myremote gs://<mybucket>`
-- In order for DVC to be able to push and pull data from the remote, you need to have valid GCP credentials.
-- Run the following command for authentication `dvc remote modify --lab2 credentialpath <YOUR JSON TOKEN LOCATION>`
-### Tracking Data with DVC
-- Ensure you have downloaded the [required data](https://www.kaggle.com/datasets/arjunbhasin2013/ccdata) and placed it in the "data" folder, renaming the file to "CC_GENERAL.csv."
-- To initiate data tracking, execute the following steps:
-	1. Run the `dvc init` command to initialize DVC for your project. This will generate a `.dvc` file that stores metadata and configuration details. Your `.dvc` file config metadata will look something like this
-	```
-    [core]
-        remote = lab2
-    ['remote "lab2"']
-        url = gs://ie7374
-	```
+````markdown
+# 🧠 Data Version Control (DVC) with Google Cloud Storage
 
-	dvc remote modify --git-action-gcp credentialpath git-action-gcp git-action-gcp-3e47dbac54ff.json 
-	2. Next, use `dvc add data/CC_GENERAL.csv` to instruct DVC to start tracking this specific dataset.
-	3. To ensure version control, add the generated `.dvc` file to your Git repository with `git add data/CC_GENERAL_csv.dvc`.
-	4. Also, include the `.gitignore` file located in the "data" folder in your Git repository by running `git add data/.gitignore`.
-	5. To complete the process, commit these changes with Git to record the dataset tracking configuration.
+This repository demonstrates the integration of **Data Version Control (DVC)** with **Google Cloud Storage (GCS)** to enable efficient, reproducible, and collaborative data management for machine learning projects.
 
-- To push your data to the remote storage in Google Cloud, use the following DVC command: `dvc push` This command will upload your data to the Google Cloud Storage bucket specified in your DVC configuration, making it accessible and versioned in the cloud.
+---
 
-### Handling Data Changes and Hash Updates
-Whenever your dataset undergoes changes, DVC will automatically compute a new hash for the updated file. Here's how the process works:
-- **Update the Dataset:** Replace the existing "CC_GENERAL.csv" file in the "data" folder with the updated version.
-- **Update DVC Tracking:** Execute `dvc add data/CC_GENERAL.csv` again to update DVC with the new version of the dataset. When DVC computes the hash for the updated file, it will be different from the previous hash, reflecting the changes in the dataset.
-- **Commit and Push:** Commit the changes with Git and push them to your Git repository. This records the update to the dataset, including the new hash.
-- **Storage in Google Cloud:** When you run dvc push, DVC uploads the updated dataset to the Google Cloud Storage bucket specified in your DVC configuration. Each version of the dataset is stored as a distinct object within the bucket, organized for easy retrieval.
-#### Reverting to Previous Versions with Hashes
-To revert to a previous dataset version:
-- **Checkout Git Commit:** Use Git to checkout the specific commit where the desired dataset version was last committed. For example, run `git checkout <commit-hash>`
-- **Use DVC:** After checking out the Git commit, use DVC to retrieve the dataset version corresponding to that commit by running `dvc checkout`. DVC uses the stored hash to identify and fetch the correct dataset version associated with that commit.
+## 📌 Overview
 
-> 💡You can follow [this](https://www.youtube.com/watch?v=kLKBcPonMYw&list=PL7WG7YrwYcnDb0qdPl9-KEStsL-3oaEjg&pp=iAQB) tutorial to learn about DVC in detail.
+Data versioning is a crucial aspect of any machine learning workflow.  
+With DVC, you can track datasets and model files just like you track code with Git.  
+The actual data is stored remotely (in Google Cloud Storage), while Git only tracks lightweight `.dvc` metadata files — keeping your repository fast and manageable.
+
+This lab walks through setting up a DVC pipeline with GCS as a remote storage backend.
+
+---
+
+## ⚙️ Prerequisites
+
+- A **Google Cloud account**
+- A **GCS bucket** (e.g., `dvc_lab_1`)
+- A **Service Account JSON key** with `Storage Object Admin` permission
+- Python 3.8+ with `pip`
+
+---
+
+## 🏗️ Step 1: Create a Google Cloud Storage Bucket
+
+1. Go to the [**Google Cloud Console**](https://console.cloud.google.com/).  
+2. In the left menu, navigate to **Storage → Buckets → Create**.  
+3. Enter a **unique name** (for example, `dvc_lab_1`).  
+4. Set **Region:** `us-east1`.  
+5. Keep other settings default and click **Create**.
+
+---
+
+## 🔐 Step 2: Create and Download Service Account Key
+
+1. In Google Cloud Console, go to **IAM & Admin → Service Accounts**.  
+2. Click **Create Service Account** → name it (e.g., `dvc-labs`).  
+3. Click **Continue** and assign the role **Storage Object Admin**.  
+4. Click **Done** to finish creation.  
+5. On the Service Account list, click **Actions → Manage Keys → Add Key → Create new key**.  
+6. Choose **JSON**, and a key file will be downloaded (e.g., `dvc-labs-477121-4e8d0f56cba4.json`).  
+   Store this file securely — it authenticates DVC to access your bucket.
+
+---
+
+## 🧩 Step 3: Install DVC with GCS Support
+
+```bash
+pip install dvc[gs]
+````
+
+> 💡 Note: Use `[s3]`, `[azure]`, or `[gdrive]` instead if using a different cloud provider.
+> To install all remotes: `pip install dvc[all]`
+
+---
+
+## 🚀 Step 4: Initialize Git and DVC
+
+```bash
+git init
+dvc init
+```
+
+This creates the `.dvc/` folder and initializes DVC tracking in your repo.
+
+---
+
+## 🌩️ Step 5: Connect DVC to Google Cloud Storage
+
+Add your bucket as the DVC remote:
+
+```bash
+dvc remote add -d myremote gs://dvc_lab_1
+```
+
+Connect your service account credentials (use the full local path to your key):
+
+```bash
+dvc remote modify --local myremote credentialpath "C:\Users\MargiShah\Downloads\dvc-labs-477121-4e8d0f56cba4.json"
+```
+
+Verify:
+
+```bash
+dvc config -l
+dvc config --local -l
+```
+
+Expected:
+
+```
+core.remote=myremote
+remote.myremote.url=gs://dvc_lab_1
+remote.myremote.credentialpath=C:\Users\MargiShah\Downloads\dvc-labs-477121-4e8d0f56cba4.json
+```
+
+---
+
+## 📦 Step 6: Track and Push Data
+
+Place your dataset files inside the `data/` folder (for example: `CC_GENERAL.csv`, `data.txt`).
+
+Then run:
+
+```bash
+dvc add data/CC_GENERAL.csv
+dvc add data/data.txt
+```
+
+Commit DVC metadata to Git:
+
+```bash
+git add data/CC_GENERAL.csv.dvc data/data.txt.dvc data/.gitignore .dvc/config
+git commit -m "Track datasets with DVC"
+```
+
+Push data to your remote bucket:
+
+```bash
+dvc push
+```
+
+Push code and metadata to GitHub:
+
+```bash
+git push origin main
+```
+
+---
+
+## 🔁 Step 7: Handling Data Updates
+
+Whenever your dataset changes:
+
+```bash
+# Replace or modify the dataset
+dvc add data/CC_GENERAL.csv
+git add data/CC_GENERAL.csv.dvc
+git commit -m "Update dataset version"
+dvc push
+git push
+```
+
+DVC automatically detects content changes, computes a new hash, and uploads only the updated parts to GCS.
+
+---
+
+## ⏪ Step 8: Revert to a Previous Version
+
+To roll back to a specific version:
+
+```bash
+git checkout <commit-hash>
+dvc checkout
+```
+
+This restores the dataset state corresponding to that Git commit.
+
+---
+
+## 🧠 Step 9: Verify Everything
+
+Check sync status:
+
+```bash
+dvc status -c
+```
+
+Expected output:
+
+```
+Data and pipelines are up to date.
+```
+
+View data in the GCP console:
+
+* Go to [**Storage → Buckets → dvc_lab_1**](https://console.cloud.google.com/storage/browser/dvc_lab_1)
+* You’ll see subfolders like `files/md5/...` — these are DVC-managed dataset versions.
+
+---
+
+## 🧾 Folder Structure
+
+```
+DVC_Labs/
+│
+├── data/
+│   ├── .gitignore
+│   ├── CC_GENERAL.csv.dvc
+│   └── data.txt.dvc
+│
+├── .dvc/
+│   ├── config
+│   ├── .gitignore
+│   └── cache/
+│
+├── .gitignore
+├── .dvcignore
+├── README.md
+└── requirements.txt   # optional
+```
+
+---
+
+## ✅ Summary
+
+| Component                | Description                              |
+| ------------------------ | ---------------------------------------- |
+| **Git**                  | Tracks source code and DVC metadata      |
+| **DVC**                  | Tracks large data and model files        |
+| **Google Cloud Storage** | Stores actual dataset blobs              |
+| **Service Account JSON** | Authenticates access between DVC and GCS |
+
+---
+
+## ✨ Verification Commands
+
+```bash
+dvc status -c           # Check sync with remote
+dvc push                # Upload data to GCS
+dvc pull                # Download from GCS
+git log --oneline       # View version history
+```
